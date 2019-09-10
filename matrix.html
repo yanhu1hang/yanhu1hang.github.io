@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<head>
+    <meta charset="utf-8">
+    <title>初等变换</title>
+    <script src="http://code.jquery.com/jquery-latest.js"></script>
+    <script src="https://cdn.bootcss.com/mathjs/6.2.1/math.min.js"></script>
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+    <script>    
+    function rendermath() {
+        MathJax.typesetClear()
+        MathJax.typeset()
+    }
+    
+    var matrix = math.matrix()
+    matrix.get_latex = function () { // 保留两位小数
+        return math.parse(this.toString()).toTex().replace(/(\d+\.\d{2})\d+/g, "$1") }
+    matrix.get_step = function () {
+        shape = this.size()
+        a = this.toArray()
+        
+        while (1) {
+            if (this.left == shape[1]) throw 'matrix done'
+        
+            // find the first non-zero element in the first col
+            for (i = this.top; i < shape[0]; ++i)
+                if (a[i][this.left] != 0) break
+            if (i == shape[0]) { // the first col is all-zero
+                this.left += 1; continue }
+            
+            // if this is not the top element, swap
+            if (i != this.top) return ['swap', i, this.top]
+        
+            // if this is the top element, execute one other row
+            for (row = i+1; row < shape[0]; ++row)
+                if (a[row][this.left] != 0) return ['transform', i, row]
+            // everythings below the top is zero, this row is ok'd
+            this.left += 1; this.top += 1; continue
+        }
+    }
+    
+    $(function () {
+        $("#reset").click(function () {
+            matrix.resize([math.randomInt(3, 6), math.randomInt(3, 6)])
+            shape = matrix.size()
+            for (i = 0; i < shape[0]; ++i) for (j = 0; j < shape[1]; ++j)
+                matrix.subset(math.index(i, j), math.randomInt(0, 20))
+
+            matrix.left = 0; matrix.top = 0;
+
+            $("#matrix").empty()
+            $("#matrix").append("<tr><td></td><td>" + matrix.get_latex() + "</td></tr>")
+            rendermath()
+            $("#next").removeAttr("disabled")
+        })
+        
+        $("#next").click(function () {
+            try {
+                transform_hint = matrix.get_step()
+            } catch(e) {
+                $("#next").attr("disabled", true);
+                return
+            }
+            shape = matrix.size()
+            i1 = transform_hint[1]; i2 = transform_hint[2]
+            latex_hint = ""
+            
+            switch (transform_hint[0]) {
+                case "swap":
+                    latex_hint = "r_{" + (i1+1) + "}" +
+                        "\\leftrightarrow" + " r_{" + (i2+1) + "}"
+                    for (j = 0; j < shape[1]; ++j) {
+                        t = matrix.subset(math.index(i1, j))
+                        matrix.subset(math.index(i1, j), matrix.subset(math.index(i2, j)))
+                        matrix.subset(math.index(i2, j), t)
+                    }
+                    break
+                case "transform":
+                    k = matrix.subset(math.index(i2, matrix.top))/
+                        matrix.subset(math.index(i1, matrix.top))
+                    latex_hint = "r_{" + (i2+1) + "}-" + // 保留两位小数
+                        k.toString().replace(/(\d+\.\d{2})\d+/g, "$1") + "*r_{" + (i1+1) + "}"
+                    for (j = 0; j < shape[1]; ++j)
+                        matrix.subset(math.index(i2, j),
+                            matrix.subset(math.index(i2, j))-k*matrix.subset(math.index(i1, j)))
+                    break
+                default:
+                    throw "unknown transformation"
+            }
+    
+            $("#matrix").append("<tr><td>"
+                + "$$\\underrightarrow{" + latex_hint + "}$$</td>"
+                + "<td>" + matrix.get_latex() + "</td></tr>")
+            rendermath()
+        })
+        
+        $("#reset").click()
+    })
+    </script>
+</head>
+
+<body>
+    <table id="matrix"></table>
+    <button id="next">下一步</button>
+    <button id="reset">重置</button>
+</body>
